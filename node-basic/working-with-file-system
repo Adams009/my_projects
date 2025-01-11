@@ -1,5 +1,9 @@
+
 const fs = require("fs")
 const path = require("path")
+
+
+// sychronous way to create a directory
 
 const datafolder = path.join(__dirname, "data") // create a data folder
 if (!fs.existsSync(datafolder)) {
@@ -7,6 +11,12 @@ if (!fs.existsSync(datafolder)) {
     console.log('foldercreated');  
 }
 
-const newfile = path.join(datafolder, "newfile.txt");
-fs.writeFileSync(newfile,"how are you doing")
+const newfile = path.join(datafolder, "newfile.txt"); // create a new file
+fs.writeFileSync(newfile,"how are you doing") // write in a file
 console.log('file created');
+
+const filecontent = fs.readFileSync(newfile, "utf-8") // read a file
+console.log(filecontent);
+
+fs.appendFileSync(newfile, "I am doing good") // append in a file
+console.log('file appended');
