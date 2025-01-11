@@ -20,3 +20,8 @@ console.log(filecontent);
 
 fs.appendFileSync(newfile, "I am doing good") // append in a file
 console.log('file appended');
+
+fs.unlinkSync(newfile) // delete a file
+
+fs.rmdirSync(datafolder) // delete a folder
+
