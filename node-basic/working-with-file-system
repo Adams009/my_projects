@@ -1,0 +1,12 @@
+const fs = require("fs")
+const path = require("path")
+
+const datafolder = path.join(__dirname, "data") // create a data folder
+if (!fs.existsSync(datafolder)) {
+    fs.mkdirSync(datafolder)
+    console.log('foldercreated');  
+}
+
+const newfile = path.join(datafolder, "newfile.txt");
+fs.writeFileSync(newfile,"how are you doing")
+console.log('file created');
