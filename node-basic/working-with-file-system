@@ -52,11 +52,32 @@ fs.writeFile(asyncFilePath, "Hello World", (err) => {
     } else {
         console.log('file created');
     }
-    // fs.readFile(asyncFilePath, "utf-8", (err, data) => {
-    //     if (err) {
-    //         console.log(err);
-    //     } else {
-    //         console.log(data);
-    //     }
-    // })
+    fs.readFile(asyncFilePath, "utf-8", (err, data) => {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log(data);
+        }
+        fs.appendFile(asyncFilePath, "I am doing good", (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                console.log('file appended');
+            }
+            fs.unlink(asyncFilePath, (err) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log('file deleted');
+                }
+                fs.rm(path.join(__dirname, "datas"), {recursive: true}, (err) => {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        console.log('folder deleted');
+                    }
+                })
+            })
+        })
+    })
 })
