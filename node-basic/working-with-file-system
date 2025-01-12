@@ -3,7 +3,7 @@ const fs = require("fs")
 const path = require("path")
 
 
-// sychronous way to create a directory
+// // sychronous way to create a directory
 
 const datafolder = path.join(__dirname, "data") // create a data folder
 if (!fs.existsSync(datafolder)) {
@@ -23,5 +23,40 @@ console.log('file appended');
 
 fs.unlinkSync(newfile) // delete a file
 
-fs.rmdirSync(datafolder) // delete a folder
+// fs.rmdirSync(datafolder) // delete a folder that contains no files
+fs.rm(datafolder, {recursive: true}, (err) => {
+    if (err) {
+        console.log(err);
+    } else {
+        console.log('folder deleted');
+    }
+}) // delete a folder with files in it
 
+
+// asynchronous way of creating file
+let asyncFilePath = path.join(__dirname, "datas")
+if (!fs.existsSync(asyncFilePath)) {
+    fs.mkdir(asyncFilePath, (err) => {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log('folder created');
+        }
+    })
+} // create a folder
+
+asyncFilePath = path.join(asyncFilePath, "asyncfile.txt")
+fs.writeFile(asyncFilePath, "Hello World", (err) => {
+    if (err) {
+        console.log(err);
+    } else {
+        console.log('file created');
+    }
+    // fs.readFile(asyncFilePath, "utf-8", (err, data) => {
+    //     if (err) {
+    //         console.log(err);
+    //     } else {
+    //         console.log(data);
+    //     }
+    // })
+})
