@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 
+
 const mongoConnector = async () => {
     try {
-        await mongoose.connect(MONGO_URI)
+        await mongoose.connect(process.env.MONGO_URI)
         console.log("Database connection established");
     } catch (err) {
         console.log("Error connecting to Mongo", err);
@@ -10,4 +11,4 @@ const mongoConnector = async () => {
     }
 }
 
-module.exports = mongoConnector
+export default mongoConnector
