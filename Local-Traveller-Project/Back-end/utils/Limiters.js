@@ -11,3 +11,5 @@ const refreshTokenLimiter = rateLimit({
     max: 3,
     message : "Too many attempts, Try again after 5 minutes",
 })
+
+export {loginLimiter, refreshTokenLimiter}

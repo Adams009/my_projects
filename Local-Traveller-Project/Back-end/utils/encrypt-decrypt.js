@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import dotenv from 'dotenv'
 dotenv.config({ path: '../.env' });
-//rsa required here
+
+//rsa key required here
 const publicKey = process.env.PUBLIC_KEY2;
 const privateKey = process.env.PRIVATE_KEY1
 
@@ -18,10 +19,4 @@ const decryptToken = (token) => {
     return decrypted.toString('utf8');
 }
 
-// Example usage:
-const accessToken = 'This is a sensitive token';
-const encryptedAccessToken = encryptToken(accessToken);
-console.log('Encrypted Access Token:', encryptedAccessToken);
-
-const decryptedAccessToken = decryptToken(encryptedAccessToken);
-console.log('Decrypted Access Token:', decryptedAccessToken);
+export { encryptToken, decryptToken }

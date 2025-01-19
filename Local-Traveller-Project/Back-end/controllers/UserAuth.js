@@ -1,97 +1,116 @@
 import argon2 from 'argon2'
-// import mongoose from 'mongoose';
+import { signToken, verifyToken } from '../utils/TokenUtils.js';
 
-import UserProfile from '../models/UserProfile.js';
 import User from '../models/User.js';
+import Blacklist from '../models/TokenBlackList.js';
 
-
-const registerController = async (req, res) => {
-    // const session = await mongoose.startSession()
-    // session.startTransaction()
+const loginUser = async (req, res, next) => {
     try {
-        // collect all necessary datas from request body
-    const {username, password, email, firstName, lastName, dob, phoneNumber, country } = req.body
+        const { email, password } = req.body; // get email and password from request body
 
-    // check if username or email is in use
-    const checkExists = User.findOne({ 
-        $or : [{ username : username  } , 
-            {email: email }]
-        })
-    
-    // send a response if username or email is in use
-    if (checkExists.username === username) {
-        return res.status(409).json({
-            status : 409,
-            message : ` ${username} already in use, use another username`
-        })
-    } else if (checkExists.email === email) {
-        return res.status(409).json({
-            status : 409,
-            message : ` ${email} already in use, use another email`
-        })
-    }
+        // check if user exists
+        const user = await User.findOne({ email: email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
-    // hash password
-    const hashedPassword = await argon2.hash(password)
+        // check if password is correct
+        const validPassword = await argon2.verify(user.password, password);
+        if (!validPassword) {
+            return res.status(400).json({ message: 'Invalid password' });
+        }
 
-    // create a new user
-    const newUser = new User({
-        username,
-        email,
-        password : hashedPassword
-    })
+        // generate token
+        const userInformation = {
+            id: user._id,
+            email: user.email,
+            role: user.role,
+        };
+        const accesstoken = await signToken(userInformation, '15m');
+        const refreshToken = await signToken(userInformation, '7d');
 
-    // save the new user
-    // await newUser.save({session})
-    await newUser.save()
+        // create cookie
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            // secure: true, // will be set to true when deploying to production
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          });
 
-    // create a new profile
-    const newProfile = {
-        firstName,
-        lastName,
-        dateOfBirth : dob,
-        phoneNumber : [phoneNumber],
-        location : {
-            country : country
-        },
-        user : newUser._id
-    }
-
-    const userProfile = new UserProfile(newProfile)
-
-    // save the new profile
-    // await newProfile.save({session})
-    await userProfile.save()
-
-    // update user with the new profile id to the user
-    newUser.userProfile = userProfile._id
-    // await newUser.save({session})
-    await newUser.save()
-    
-    // commit the transaction
-    // await session.commitTransaction()
-    // end the session
-    // session.endSession()
-
-    // send a response if user and profile are created successfully
-    if (newUser && newProfile) {
-        res.status(201).json({
-            status : 201,
-            message : 'User Created Successfully',
-            data : {
-                user : newUser,
-                profile : newProfile
-            }
-        })
-    } else {
-        res.status(500).json({
-            status : 500,
-            message : 'Something went wrong, please try again later'
-        })
-    }
-    } catch (err) {
-        res.status(500).json({message : err.message})
+        // send token as response
+        res.json({ 
+            message : 'Login Successful',
+            accesstoken });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
 }
 
-export default registerController;
+
+const refreshToken = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+        if (!refreshToken) {
+            return res.status(401).json({ message: 'No refresh token provided' });
+        }
+
+        // verify token
+        const decoded = await verifyToken(refreshToken);
+        if (!decoded) {
+            return res.status(401).json({ message: 'Invalid refresh token' });
+        }
+
+        // generate new access token
+        const userInformation = {
+            id: decoded.id,
+            email: decoded.email,
+            role: decoded.role,
+        };
+        const newAccesstoken = await signToken(userInformation, '15m');
+        const newRefreshToken = await signToken(userInformation, '7d');
+
+        // create cookie
+        res.cookie('refreshToken', newRefreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          });
+          
+        // send token as response
+        res.json({ accesstoken : newAccesstoken });
+    } catch (error) {
+        console.error(error);
+        res.status(403).json({ message: 'Invalid or expired refresh token.' });
+    }
+}
+
+const logoutUser = async (req, res) => {
+    try {
+        // Get the refresh token from the cookies
+    
+        const refreshToken = req.cookies.refreshToken;
+        if (!refreshToken) {
+            return res.status(401).json({ message: 'No refresh token provided' });
+        }
+
+        // verify token
+        const decoded = await verifyToken(refreshToken);
+        if (!decoded) {
+            return res.status(401).json({ message: 'Invalid refresh token' });
+        }
+
+        // Add token to the blacklist
+        await Blacklist.create({ token: refreshToken });
+
+        // Clear the refresh token from the session and browser session
+        res.clearCookie('refreshToken', { path: '/' });
+        res.status(200).json({ message: 'Logged out successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+}
+
+export { refreshToken, loginUser, logoutUser }
