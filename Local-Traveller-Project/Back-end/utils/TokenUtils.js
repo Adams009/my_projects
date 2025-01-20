@@ -50,20 +50,35 @@ const signToken = async (payload, expiresIn = '15m') => {
 
 const verifyToken = async (token) => {
     try {
-        if (token) {
+        if (!token) {
             throw new Error('Token is required');
         }
 
-        const isBlacklisted = await Blacklist.findOne({ token });
+        // Hash the token
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        // Check if the token is blacklisted
+        const isBlacklisted = await Blacklist.findOne({ token : hashedToken });
         if (isBlacklisted) {
             throw new Error('Token is blacklisted');
         }
 
         // ensure public_key is defined before verifying
 
-        return await V4.verify(token, public_key)
+         // Verify the token
+        const decoded = await V4.verify(token, public_key)
+
+        // Additional timestamp check (if necessary)
+        const currentTimestamp = Math.floor(Date.now() / 1000);
+        if (decoded.exp < currentTimestamp) {
+            throw new Error('Token has expired');
+        }
+
+        return decoded;
+
     } catch (e) {
-        throw new Error('Invalid or Expired token', e.message)
+        console.error(`Error verifying token: ${e.message}`); // Log the detailed error
+        throw new Error('Invalid or Expired token'); // User-friendly error message
     }
 }
 

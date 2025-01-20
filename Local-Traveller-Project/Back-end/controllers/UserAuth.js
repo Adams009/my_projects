@@ -1,5 +1,6 @@
 import argon2 from 'argon2'
 import { signToken, verifyToken } from '../utils/TokenUtils.js';
+import crypto from 'crypto';
 
 import User from '../models/User.js';
 import Blacklist from '../models/TokenBlackList.js';
@@ -32,8 +33,10 @@ const loginUser = async (req, res, next) => {
         // create cookie
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Enable secure cookies in production
             // secure: true, // will be set to true when deploying to production
             sameSite: 'strict',
+            domain: process.env.COOKIE_DOMAIN || 'localhost', // Configure for your domain
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
           });
 
@@ -41,6 +44,7 @@ const loginUser = async (req, res, next) => {
         res.json({ 
             message : 'Login Successful',
             accesstoken });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
@@ -50,7 +54,8 @@ const loginUser = async (req, res, next) => {
 
 const refreshToken = async (req, res) => {
     try {
-        const refreshToken = req.cookies.refreshToken;
+        const refreshToken = req.cookies['refreshToken'];
+        
         if (!refreshToken) {
             return res.status(401).json({ message: 'No refresh token provided' });
         }
@@ -61,11 +66,17 @@ const refreshToken = async (req, res) => {
             return res.status(401).json({ message: 'Invalid refresh token' });
         }
 
+        // Check if the user still exists
+        const user = await User.findById(decoded.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
         // generate new access token
         const userInformation = {
-            id: decoded.id,
-            email: decoded.email,
-            role: decoded.role,
+            id: user._id,
+            email: user.email,
+            role: user.role,
         };
         const newAccesstoken = await signToken(userInformation, '15m');
         const newRefreshToken = await signToken(userInformation, '7d');
@@ -73,8 +84,10 @@ const refreshToken = async (req, res) => {
         // create cookie
         res.cookie('refreshToken', newRefreshToken, {
             httpOnly: true,
-            secure: true,
+            secure: process.env.NODE_ENV === 'production', // Enable secure cookies in production
+            // secure: true, to uncomment this line when deploying
             sameSite: 'strict',
+            domain: process.env.COOKIE_DOMAIN || 'localhost', // Configure for your domain
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
           });
           
@@ -91,6 +104,7 @@ const logoutUser = async (req, res) => {
         // Get the refresh token from the cookies
     
         const refreshToken = req.cookies.refreshToken;
+        
         if (!refreshToken) {
             return res.status(401).json({ message: 'No refresh token provided' });
         }
@@ -101,8 +115,11 @@ const logoutUser = async (req, res) => {
             return res.status(401).json({ message: 'Invalid refresh token' });
         }
 
-        // Add token to the blacklist
-        await Blacklist.create({ token: refreshToken });
+        // Hash the refresh token
+        const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+        // Add the hashed token to the blacklist
+        await Blacklist.create({ token: hashedToken });
 
         // Clear the refresh token from the session and browser session
         res.clearCookie('refreshToken', { path: '/' });
