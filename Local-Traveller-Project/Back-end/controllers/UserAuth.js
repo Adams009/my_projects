@@ -59,7 +59,7 @@ const refreshToken = async (req, res) => {
         if (!refreshToken) {
             return res.status(401).json({ message: 'No refresh token provided' });
         }
-
+        
         // verify token
         const decoded = await verifyToken(refreshToken);
         if (!decoded) {
@@ -78,8 +78,13 @@ const refreshToken = async (req, res) => {
             email: user.email,
             role: user.role,
         };
+
         const newAccesstoken = await signToken(userInformation, '15m');
         const newRefreshToken = await signToken(userInformation, '7d');
+
+        // hash and add the refresh token to blacklist
+        const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+        await Blacklist.create({ token: hashedToken });
 
         // create cookie
         res.cookie('refreshToken', newRefreshToken, {
@@ -95,7 +100,7 @@ const refreshToken = async (req, res) => {
         res.json({ accesstoken : newAccesstoken });
     } catch (error) {
         console.error(error);
-        res.status(403).json({ message: 'Invalid or expired refresh token.' });
+        res.status(403).json({ message: 'Invalid or expired token.' });
     }
 }
 
@@ -111,6 +116,7 @@ const logoutUser = async (req, res) => {
 
         // verify token
         const decoded = await verifyToken(refreshToken);
+        
         if (!decoded) {
             return res.status(401).json({ message: 'Invalid refresh token' });
         }
