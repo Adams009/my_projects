@@ -85,6 +85,12 @@ const refreshToken = async (req, res) => {
         // hash and add the refresh token to blacklist
         const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
         await Blacklist.create({ token: hashedToken });
+        res.clearCookie('refreshToken', {  httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Enable secure cookies in production
+            // secure: true, to uncomment this line when deploying
+            sameSite: 'strict',
+            domain: process.env.COOKIE_DOMAIN || 'localhost', // Configure for your domain
+        });
 
         // create cookie
         res.cookie('refreshToken', newRefreshToken, {
@@ -128,7 +134,12 @@ const logoutUser = async (req, res) => {
         await Blacklist.create({ token: hashedToken });
 
         // Clear the refresh token from the session and browser session
-        res.clearCookie('refreshToken', { path: '/' });
+        res.clearCookie('refreshToken', {  httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Enable secure cookies in production
+            // secure: true, to uncomment this line when deploying
+            sameSite: 'strict',
+            domain: process.env.COOKIE_DOMAIN || 'localhost', // Configure for your domain
+        });
         res.status(200).json({ message: 'Logged out successfully' });
     } catch (error) {
         console.error(error);

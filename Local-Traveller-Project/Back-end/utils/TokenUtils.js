@@ -82,7 +82,7 @@ const verifyToken = async (token) => {
         if (decoded.exp < currentTimestamp) {
             throw new Error('Token has expired');
         }
-
+        
         return decoded;
 
     } catch (e) {
