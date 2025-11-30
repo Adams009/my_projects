@@ -79,8 +79,11 @@ const registerController = async (req, res) => {
             status : 201,
             message : 'User Created Successfully',
             data : {
-                user : newUser,
-                profile : newProfile
+                username,
+                email,
+                firstName,
+                lastName,
+                
             }
         })
     } else {
