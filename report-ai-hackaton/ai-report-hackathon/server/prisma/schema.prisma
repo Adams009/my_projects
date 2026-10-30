@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  REPORTER
+  TRIAGE_OFFICER
+  TEAM_MEMBER
+  SUPERVISOR
+  ORGANIZATION_ADMIN
+}
+
+enum Category {
+  ROAD_INFRASTRUCTURE
+  DRAINAGE_FLOODING
+  WASTE_SANITATION
+  WATER_PLUMBING
+  ELECTRICAL_LIGHTING
+  BUILDING_MAINTENANCE
+  ICT_EQUIPMENT
+  OTHER_FACILITY_ISSUE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReportStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  ACKNOWLEDGED
+  IN_PROGRESS
+  NEEDS_INFORMATION
+  REASSIGNMENT_REQUESTED
+  RESOLVED
+  VERIFIED
+  CLOSED
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  teams     Team[]
+  locations Location[]
+  reports   Report[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  organizationId String
+  firstName      String?
+  lastName       String?
+  email          String   @unique
+  role           Role     @default(REPORTER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reports       Report[]        @relation("ReportReporter")
+  historyEvents ReportHistory[] @relation("HistoryActor")
+
+  @@index([organizationId])
+}
+
+model Team {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reports      Report[]
+
+  @@index([organizationId])
+}
+
+model Location {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reports      Report[]
+
+  @@index([organizationId])
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  organizationId String
+  reporterId     String
+  locationId     String?
+  assignedTeamId String?
+  title          String?
+  description    String
+  category       Category
+  priority       Priority     @default(MEDIUM)
+  status         ReportStatus @default(SUBMITTED)
+  aiSummary      String?
+  aiCategory     Category?
+  aiConfidence   Float?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reporter     User            @relation("ReportReporter", fields: [reporterId], references: [id])
+  location     Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assignedTeam Team?           @relation(fields: [assignedTeamId], references: [id], onDelete: SetNull)
+  history      ReportHistory[]
+
+  @@index([organizationId])
+  @@index([reporterId])
+  @@index([status])
+  @@index([assignedTeamId])
+}
+
+model ReportHistory {
+  id             String        @id @default(uuid())
+  reportId       String
+  actorId        String?
+  previousStatus ReportStatus?
+  newStatus      ReportStatus
+  action         String
+  notes          String?
+  createdAt      DateTime      @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  actor  User?  @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
+  @@index([actorId])
+}
