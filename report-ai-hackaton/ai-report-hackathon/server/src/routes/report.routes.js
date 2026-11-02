@@ -6,8 +6,12 @@ import {
   updateReportStatus,
   assignReport,
 } from "../controllers/report.controller.js";
+import { requireAuth } from "../middleware/auth.middleware.js";
+
 
 const reportRouter = Router();
+
+reportRouter.use(requireAuth); // Apply authentication middleware to all report routes
 
 reportRouter.post("/", createReport);
 reportRouter.get("/", listReports);
