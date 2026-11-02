@@ -1,8 +1,6 @@
 import { z } from "zod";
 
 export const createReportSchema = z.object({
-  organizationId: z.string().uuid(),
-  reporterId: z.string().uuid(),
   locationId: z.string().uuid().optional(),
   title: z.string().trim().min(3).max(255).optional(),
   description: z.string().trim().min(10).max(5000),
@@ -35,10 +33,8 @@ export const updateReportStatusSchema = z.object({
     "CLOSED",
   ]),
   notes: z.string().trim().max(2000).optional(),
-  actorId: z.string().uuid(),
 });
 
 export const assignReportSchema = z.object({
-  actorId: z.string().uuid(),
   teamId: z.string().trim().min(1).optional(),
 });
