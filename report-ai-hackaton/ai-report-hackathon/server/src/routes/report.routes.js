@@ -7,6 +7,7 @@ import {
   assignReport,
   listReportOrganizations,
   listReportLocations,
+  acknowledgeAssignment,
 } from "../controllers/report.controller.js";
 import { requireRoles } from "../middleware/authorization.middleware.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
@@ -35,6 +36,11 @@ reportRouter.post(
   "/:reportId/assign",
   requireRoles("TRIAGE_OFFICER", "SUPERVISOR", "ORGANIZATION_ADMIN"),
   assignReport,
+);
+reportRouter.post(
+  "/assignments/:assignmentId/acknowledge",
+  requireRoles("TEAM_MEMBER", "SUPERVISOR", "ORGANIZATION_ADMIN"),
+  acknowledgeAssignment,
 );
 
 export default reportRouter;
