@@ -15,6 +15,16 @@ enum Role {
   ORGANIZATION_ADMIN
 }
 
+enum OrganizationType {
+  GOVERNMENT
+  COMPANY
+  SCHOOL
+  HOSPITAL
+  NGO
+  COMMUNITY
+  OTHER
+}
+
 enum Category {
   ROAD_INFRASTRUCTURE
   DRAINAGE_FLOODING
@@ -46,23 +56,49 @@ enum ReportStatus {
   CLOSED
 }
 
-model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
 
-  users     User[]
-  teams     Team[]
-  locations Location[]
-  reports   Report[]
+enum AssignmentStatus {
+  PENDING
+  ACKNOWLEDGED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  CANCELLED
+}
+
+enum AssignmentReviewStatus {
+  NOT_REVIEWED
+  APPROVED
+  REJECTED
+}
+
+model Organization {
+  id        String            @id @default(uuid())
+  name      String
+  slug      String            @unique
+  type      OrganizationType?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  users       User[]
+  memberships OrganizationMembership[]
+  invitations OrganizationInvitation[]
+  teams       Team[]
+  locations   Location[]
+  reports     Report[]
 }
 
 model User {
   id             String   @id @default(uuid())
-  organizationId String
+  organizationId String?
   firstName      String?
   lastName       String?
   email          String   @unique
@@ -71,11 +107,55 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reports       Report[]        @relation("ReportReporter")
-  historyEvents ReportHistory[] @relation("HistoryActor")
+  organization        Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  memberships         OrganizationMembership[]
+  sentInvitations     OrganizationInvitation[] @relation("InvitationInviter")
+  reports             Report[]                 @relation("ReportReporter")
+  historyEvents       ReportHistory[]          @relation("HistoryActor")
+  assignmentsCreated  ReportAssignment[]       @relation("AssignmentCreator")
+  assignmentsReviewed ReportAssignment[]       @relation("AssignmentReviewer")
 
   @@index([organizationId])
+}
+
+model OrganizationMembership {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  role           Role     @default(REPORTER)
+  teamId         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([teamId])
+}
+
+model OrganizationInvitation {
+  id             String           @id @default(uuid())
+  organizationId String
+  invitedById    String
+  email          String
+  tokenHash      String           @unique
+  role           Role             @default(REPORTER)
+  teamId         String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  declinedAt     DateTime?
+  status         InvitationStatus @default(PENDING)
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+  team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([email])
 }
 
 model Team {
@@ -87,8 +167,11 @@ model Team {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reports      Report[]
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reports           Report[]
+  memberships       OrganizationMembership[]
+  invitations       OrganizationInvitation[]
+  reportAssignments ReportAssignment[]
 
   @@index([organizationId])
 }
@@ -125,11 +208,12 @@ model Report {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reporter     User            @relation("ReportReporter", fields: [reporterId], references: [id])
-  location     Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  assignedTeam Team?           @relation(fields: [assignedTeamId], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reporter     User               @relation("ReportReporter", fields: [reporterId], references: [id])
+  location     Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assignedTeam Team?              @relation(fields: [assignedTeamId], references: [id], onDelete: SetNull)
   history      ReportHistory[]
+  assignments  ReportAssignment[]
 
   @@index([organizationId])
   @@index([reporterId])
@@ -152,4 +236,35 @@ model ReportHistory {
 
   @@index([reportId])
   @@index([actorId])
+}
+
+model ReportAssignment {
+  id             String                 @id @default(uuid())
+  reportId       String
+  teamId         String
+  assignedById   String
+  reviewedById   String?
+  status         AssignmentStatus       @default(PENDING)
+  reviewStatus   AssignmentReviewStatus @default(NOT_REVIEWED)
+  assignedAt     DateTime               @default(now())
+  acknowledgedAt DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  reviewedAt     DateTime?
+  completionNote String?
+  reviewNote     String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  report     Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  team       Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  assignedBy User   @relation("AssignmentCreator", fields: [assignedById], references: [id])
+  reviewedBy User?  @relation("AssignmentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
+  @@index([teamId])
+  @@index([assignedById])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([reviewStatus])
 }
