@@ -5,9 +5,10 @@ import {
   getReportHistory,
   updateReportStatus,
   assignReport,
+  acknowledgeAssignment,
+  startAssignment,
   listReportOrganizations,
   listReportLocations,
-  acknowledgeAssignment,
 } from "../controllers/report.controller.js";
 import { requireRoles } from "../middleware/authorization.middleware.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
@@ -41,6 +42,11 @@ reportRouter.post(
   "/assignments/:assignmentId/acknowledge",
   requireRoles("TEAM_MEMBER", "SUPERVISOR", "ORGANIZATION_ADMIN"),
   acknowledgeAssignment,
+);
+reportRouter.post(
+  "/assignments/:assignmentId/start",
+  requireRoles("TEAM_MEMBER", "SUPERVISOR", "ORGANIZATION_ADMIN"),
+  startAssignment,
 );
 
 export default reportRouter;
