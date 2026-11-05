@@ -6,6 +6,110 @@ import {
 } from "../schemas/report.schema.js";
 import { analyzeReportWithAI } from "../services/ai.service.js";
 
+const staffRoles = [
+  "TRIAGE_OFFICER",
+  "TEAM_MEMBER",
+  "SUPERVISOR",
+  "ORGANIZATION_ADMIN",
+];
+
+const assignmentRoles = [
+  "TRIAGE_OFFICER",
+  "SUPERVISOR",
+  "ORGANIZATION_ADMIN",
+];
+
+const teamByCategory = {
+  ROAD_INFRASTRUCTURE: "Works and Maintenance",
+  DRAINAGE_FLOODING: "Works and Maintenance",
+  WASTE_SANITATION: "Works and Maintenance",
+  WATER_PLUMBING: "Works and Maintenance",
+  ELECTRICAL_LIGHTING: "Works and Maintenance",
+  BUILDING_MAINTENANCE: "Works and Maintenance",
+  ICT_EQUIPMENT: "ICT Support",
+  OTHER_FACILITY_ISSUE: "Works and Maintenance",
+};
+
+export async function listReportOrganizations(req, res) {
+  try {
+    const organizations = await prisma.organization.findMany({
+      where: {
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        type: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return res.json({
+      status: "success",
+      organizations,
+    });
+  } catch (error) {
+    console.error("List report organizations error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      message: "Unable to fetch organizations",
+    });
+  }
+}
+
+export async function listReportLocations(req, res) {
+  const { organizationId } = req.params;
+
+  try {
+    const organization = await prisma.organization.findFirst({
+      where: {
+        id: organizationId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!organization) {
+      return res.status(404).json({
+        status: "error",
+        message: "Organization not found",
+      });
+    }
+
+    const locations = await prisma.location.findMany({
+      where: {
+        organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return res.json({
+      status: "success",
+      locations,
+    });
+  } catch (error) {
+    console.error("List report locations error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      message: "Unable to fetch locations",
+    });
+  }
+}
+
 export async function createReport(req, res) {
   const validationResult = createReportSchema.safeParse(req.body);
 
@@ -18,8 +122,7 @@ export async function createReport(req, res) {
   }
 
   const {
-    organizationId,
-    reporterId,
+    organizationId: requestedOrganizationId,
     locationId,
     title,
     description,
@@ -27,10 +130,21 @@ export async function createReport(req, res) {
     priority,
   } = validationResult.data;
 
+  const organizationId = requestedOrganizationId || req.user.organizationId;
+  const reporterId = req.user.id;
+
+  if (!organizationId) {
+    return res.status(400).json({
+      status: "error",
+      message: "Choose an organization for this report",
+    });
+  }
+
   try {
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organization.findFirst({
       where: {
         id: organizationId,
+        isActive: true,
       },
     });
 
@@ -38,20 +152,6 @@ export async function createReport(req, res) {
       return res.status(404).json({
         status: "error",
         message: "Organization not found",
-      });
-    }
-
-    const reporter = await prisma.user.findFirst({
-      where: {
-        id: reporterId,
-        organizationId,
-      },
-    });
-
-    if (!reporter) {
-      return res.status(404).json({
-        status: "error",
-        message: "Reporter not found in this organization",
       });
     }
 
@@ -71,43 +171,32 @@ export async function createReport(req, res) {
       }
     }
 
-    // const report = await prisma.report.create({
-    //   data: {
-    //     organizationId,
-    //     reporterId,
-    //     locationId,
-    //     title,
-    //     description,
-    //     category,
-    //     priority,
-    //   },
-    // });
     let aiAnalysis = null;
 
-try {
-  aiAnalysis = await analyzeReportWithAI({
-    title,
-    description,
-  });
-} catch (error) {
-  console.error("AI report analysis failed:", error.message);
-}
+    try {
+      aiAnalysis = await analyzeReportWithAI({
+        title,
+        description,
+      });
+    } catch (error) {
+      console.error("AI report analysis failed:", error.message);
+    }
 
-const report = await prisma.report.create({
-  data: {
-    organizationId,
-    reporterId,
-    locationId,
-    title,
-    description,
-    category,
-    priority,
-    aiSummary: aiAnalysis?.summary ?? null,
-    aiCategory: aiAnalysis?.category ?? null,
-    aiConfidence: aiAnalysis?.confidence ?? null,
-    aiRationale: aiAnalysis?.rationale ?? null,
-  },
-});
+    const report = await prisma.report.create({
+      data: {
+        organizationId,
+        reporterId,
+        locationId,
+        title,
+        description,
+        category,
+        priority,
+        aiSummary: aiAnalysis?.summary ?? null,
+        aiCategory: aiAnalysis?.category ?? null,
+        aiConfidence: aiAnalysis?.confidence ?? null,
+        aiRationale: aiAnalysis?.rationale ?? null,
+      },
+    });
 
     await prisma.reportHistory.create({
       data: {
@@ -119,24 +208,19 @@ const report = await prisma.report.create({
       },
     });
 
-    // return res.status(201).json({
-    //   status: "success",
-    //   message: "Report created successfully",
-    //   report,
-    // });
     return res.status(201).json({
-  status: "success",
-  message: "Report created successfully",
-  report,
-  aiAnalysis: aiAnalysis
-    ? {
-        summary: aiAnalysis.summary,
-        category: aiAnalysis.category,
-        confidence: aiAnalysis.confidence,
-        rationale: aiAnalysis.rationale,
-      }
-    : null,
-});
+      status: "success",
+      message: "Report created successfully",
+      report,
+      aiAnalysis: aiAnalysis
+        ? {
+            summary: aiAnalysis.summary,
+            category: aiAnalysis.category,
+            confidence: aiAnalysis.confidence,
+            rationale: aiAnalysis.rationale,
+          }
+        : null,
+    });
   } catch (error) {
     console.error("Create report error:", error);
 
@@ -147,21 +231,25 @@ const report = await prisma.report.create({
   }
 }
 
-
 export async function listReports(req, res) {
-  const organizationId = req.query.organizationId;
-
-  if (!organizationId) {
-    return res.status(400).json({
-      status: "error",
-      message: "organizationId is required",
-    });
-  }
+  const organizationId = req.user.organizationId;
+  const isReporter = req.user.role === "REPORTER";
+  const reportVisibility = organizationId
+    ? {
+        OR: [
+          { organizationId },
+          { reporterId: req.user.id },
+        ],
+      }
+    : { reporterId: req.user.id };
 
   try {
     const reports = await prisma.report.findMany({
       where: {
-        organizationId,
+        ...reportVisibility,
+        ...(isReporter && organizationId
+          ? { reporterId: req.user.id }
+          : {}),
       },
       include: {
         location: true,
@@ -197,11 +285,23 @@ export async function listReports(req, res) {
 
 export async function getReportHistory(req, res) {
   const { reportId } = req.params;
+  const organizationId = req.user.organizationId;
+  const isReporter = req.user.role === "REPORTER";
+  const reportVisibility = organizationId
+    ? {
+        OR: [
+          { organizationId },
+          { reporterId: req.user.id },
+        ],
+      }
+    : { reporterId: req.user.id };
 
   try {
-    const report = await prisma.report.findUnique({
+    const report = await prisma.report.findFirst({
       where: {
         id: reportId,
+        ...reportVisibility,
+        ...(isReporter && organizationId ? { reporterId: req.user.id } : {}),
       },
       select: {
         id: true,
@@ -261,13 +361,22 @@ export async function updateReportStatus(req, res) {
     });
   }
 
-  const { status, notes, actorId } = validationResult.data;
+  const { status, notes } = validationResult.data;
+  const actorId = req.user.id;
   const { reportId } = req.params;
 
+  if (!staffRoles.includes(req.user.role)) {
+    return res.status(403).json({
+      status: "error",
+      message: "You are not allowed to update report status",
+    });
+  }
+
   try {
-    const report = await prisma.report.findUnique({
+    const report = await prisma.report.findFirst({
       where: {
         id: reportId,
+        organizationId: req.user.organizationId,
       },
     });
 
@@ -275,20 +384,6 @@ export async function updateReportStatus(req, res) {
       return res.status(404).json({
         status: "error",
         message: "Report not found",
-      });
-    }
-
-    const actor = await prisma.user.findFirst({
-      where: {
-        id: actorId,
-        organizationId: report.organizationId,
-      },
-    });
-
-    if (!actor) {
-      return res.status(403).json({
-        status: "error",
-        message: "Actor does not belong to this organization",
       });
     }
 
@@ -342,24 +437,15 @@ export async function assignReport(req, res) {
     });
   }
 
-  const { actorId, teamId } = validationResult.data;
+  const { teamId } = validationResult.data;
+  const actorId = req.user.id;
   const { reportId } = req.params;
 
-  const teamByCategory = {
-    ROAD_INFRASTRUCTURE: "Works and Maintenance",
-    DRAINAGE_FLOODING: "Works and Maintenance",
-    WASTE_SANITATION: "Works and Maintenance",
-    WATER_PLUMBING: "Works and Maintenance",
-    ELECTRICAL_LIGHTING: "Works and Maintenance",
-    BUILDING_MAINTENANCE: "Works and Maintenance",
-    ICT_EQUIPMENT: "ICT Support",
-    OTHER_FACILITY_ISSUE: "Works and Maintenance",
-  };
-
   try {
-    const report = await prisma.report.findUnique({
+    const report = await prisma.report.findFirst({
       where: {
         id: reportId,
+        organizationId: req.user.organizationId,
       },
     });
 
@@ -367,20 +453,6 @@ export async function assignReport(req, res) {
       return res.status(404).json({
         status: "error",
         message: "Report not found",
-      });
-    }
-
-    const actor = await prisma.user.findFirst({
-      where: {
-        id: actorId,
-        organizationId: report.organizationId,
-      },
-    });
-
-    if (!actor) {
-      return res.status(403).json({
-        status: "error",
-        message: "Actor does not belong to this organization",
       });
     }
 
@@ -418,16 +490,52 @@ export async function assignReport(req, res) {
           isActive: true,
         },
       });
+
+      if (!team) {
+        return res.status(422).json({
+          status: "error",
+          message: "Configured routing team was not found",
+        });
+      }
     }
 
-    if (!team) {
-      return res.status(422).json({
+    const existingAssignment = await prisma.reportAssignment.findFirst({
+      where: {
+        reportId,
+        teamId: team.id,
+        status: {
+          notIn: ["CANCELLED", "DECLINED"],
+        },
+      },
+    });
+
+    if (existingAssignment) {
+      return res.status(409).json({
         status: "error",
-        message: "Configured routing team was not found",
+        message: "This team is already assigned to the report",
       });
     }
 
-    const assignedReport = await prisma.$transaction(async (transaction) => {
+    const result = await prisma.$transaction(async (transaction) => {
+      const assignment = await transaction.reportAssignment.create({
+        data: {
+          reportId,
+          teamId: team.id,
+          assignedById: actorId,
+          status: "PENDING",
+          reviewStatus: "NOT_REVIEWED",
+        },
+        include: {
+          team: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+        },
+      });
+
       const updatedReport = await transaction.report.update({
         where: {
           id: reportId,
@@ -451,14 +559,17 @@ export async function assignReport(req, res) {
         },
       });
 
-      return updatedReport;
+      return {
+        assignment,
+        report: updatedReport,
+      };
     });
 
-    return res.json({
+    return res.status(201).json({
       status: "success",
       message: "Report assigned successfully",
-      report: assignedReport,
-      assignedTeam: team,
+      report: result.report,
+      assignment: result.assignment,
     });
   } catch (error) {
     console.error("Assign report error:", error);
