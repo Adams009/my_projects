@@ -580,3 +580,115 @@ export async function assignReport(req, res) {
     });
   }
 }
+
+export async function acknowledgeAssignment(req, res) {
+  const { assignmentId } = req.params;
+
+  if (!req.user.organizationId) {
+    return res.status(403).json({
+      status: "error",
+      message: "An active organization is required",
+    });
+  }
+
+  if (!req.user.teamId) {
+    return res.status(403).json({
+      status: "error",
+      message: "You must belong to a team to acknowledge an assignment",
+    });
+  }
+
+  try {
+    const assignment = await prisma.reportAssignment.findFirst({
+      where: {
+        id: assignmentId,
+        teamId: req.user.teamId,
+        report: {
+          organizationId: req.user.organizationId,
+        },
+      },
+      include: {
+        report: true,
+        team: true,
+      },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({
+        status: "error",
+        message: "Assignment not found for your team",
+      });
+    }
+
+    if (assignment.status !== "PENDING") {
+      return res.status(409).json({
+        status: "error",
+        message: `This assignment cannot be acknowledged because its current status is ${assignment.status}`,
+      });
+    }
+
+    const result = await prisma.$transaction(async (transaction) => {
+      const updatedAssignment = await transaction.reportAssignment.update({
+        where: {
+          id: assignmentId,
+        },
+        data: {
+          status: "ACKNOWLEDGED",
+          acknowledgedAt: new Date(),
+        },
+        include: {
+          team: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+        },
+      });
+
+      let updatedReport = assignment.report;
+
+      if (assignment.report.status === "ASSIGNED") {
+        updatedReport = await transaction.report.update({
+          where: {
+            id: assignment.reportId,
+          },
+          data: {
+            status: "ACKNOWLEDGED",
+          },
+        });
+
+        await transaction.reportHistory.create({
+          data: {
+            reportId: assignment.reportId,
+            actorId: req.user.id,
+            previousStatus: assignment.report.status,
+            newStatus: "ACKNOWLEDGED",
+            action: "ASSIGNMENT_ACKNOWLEDGED",
+            notes: `Assignment acknowledged by ${assignment.team.name}`,
+          },
+        });
+      }
+
+      return {
+        assignment: updatedAssignment,
+        report: updatedReport,
+      };
+    });
+
+    return res.json({
+      status: "success",
+      message: "Assignment acknowledged successfully",
+      assignment: result.assignment,
+      report: result.report,
+    });
+  } catch (error) {
+    console.error("Acknowledge assignment error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      message: "Unable to acknowledge assignment",
+    });
+  }
+}
