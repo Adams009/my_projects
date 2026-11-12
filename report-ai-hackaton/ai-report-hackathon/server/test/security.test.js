@@ -28,7 +28,7 @@ import {
 import { validateEnvironment } from "../src/config/environment.js";
 import {
   sendEmail,
-  verifyEmailProvider,
+  verifyEmailConfiguration,
 } from "../src/services/email.service.js";
 
 process.env.JWT_SECRET = "access-test-secret-that-is-long-enough-123456";
@@ -230,8 +230,8 @@ test("email delivery rejects incomplete Brevo configuration", async () => {
       }),
       /Brevo is not configured correctly/,
     );
-    await assert.rejects(
-      verifyEmailProvider(),
+    assert.throws(
+      verifyEmailConfiguration,
       /Brevo is not configured correctly/,
     );
   } finally {
@@ -245,7 +245,7 @@ test("email delivery rejects incomplete Brevo configuration", async () => {
   }
 });
 
-test("Brevo verification and email delivery use the HTTP API", async () => {
+test("Brevo configuration is local and email delivery uses the HTTP API", async () => {
   const brevoNames = ["BREVO_API_KEY", "BREVO_SENDER_EMAIL"];
   const originalValues = Object.fromEntries(
     brevoNames.map((name) => [name, process.env[name]]),
@@ -258,12 +258,12 @@ test("Brevo verification and email delivery use the HTTP API", async () => {
   globalThis.fetch = async (url, options) => {
     requests.push({ url, options });
     return new Response("{}", {
-      status: url.endsWith("/account") ? 200 : 201,
+      status: 201,
     });
   };
 
   try {
-    assert.equal(await verifyEmailProvider(), true);
+    assert.equal(verifyEmailConfiguration(), true);
     assert.equal(
       await sendEmail({
         to: "recipient@example.com",
@@ -273,10 +273,11 @@ test("Brevo verification and email delivery use the HTTP API", async () => {
       true,
     );
 
-    assert.equal(requests[0].url, "https://api.brevo.com/v3/account");
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "https://api.brevo.com/v3/smtp/email");
+    assert.equal(requests[0].options.method, "POST");
     assert.equal(requests[0].options.headers["api-key"], "test-api-key");
-    assert.equal(requests[1].url, "https://api.brevo.com/v3/smtp/email");
-    assert.deepEqual(JSON.parse(requests[1].options.body), {
+    assert.deepEqual(JSON.parse(requests[0].options.body), {
       sender: { email: "no-reply@example.com", name: "CivicFix" },
       to: [{ email: "recipient@example.com" }],
       subject: "Test",
@@ -294,7 +295,7 @@ test("Brevo verification and email delivery use the HTTP API", async () => {
   }
 });
 
-test("Brevo API failures expose status without returning provider response content", async () => {
+test("Brevo sending failures expose status without provider response content", async () => {
   const brevoNames = ["BREVO_API_KEY", "BREVO_SENDER_EMAIL"];
   const originalValues = Object.fromEntries(
     brevoNames.map((name) => [name, process.env[name]]),
@@ -309,12 +310,19 @@ test("Brevo API failures expose status without returning provider response conte
     });
 
   try {
-    await assert.rejects(verifyEmailProvider(), (error) => {
+    await assert.rejects(
+      sendEmail({
+        to: "recipient@example.com",
+        subject: "Test",
+        text: "Test message",
+      }),
+      (error) => {
       assert.equal(error.status, 401);
       assert.match(error.message, /status 401/);
       assert.doesNotMatch(error.message, /provider diagnostic detail/);
       return true;
-    });
+      },
+    );
   } finally {
     globalThis.fetch = originalFetch;
     for (const name of brevoNames) {

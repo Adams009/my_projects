@@ -57,8 +57,8 @@ async function brevoRequest(path, options = {}) {
   return response;
 }
 
-export async function verifyEmailProvider() {
-  await brevoRequest("/account");
+export function verifyEmailConfiguration() {
+  getBrevoConfig();
   return true;
 }
 

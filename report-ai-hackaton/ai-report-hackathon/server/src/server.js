@@ -3,7 +3,7 @@ import app from "./app.js";
 import { validateEnvironment } from "./config/environment.js";
 import { closeRateLimitStores } from "./lib/rate-limit-store.js";
 import { prisma } from "./lib/prisma.js";
-import { verifyEmailProvider } from "./services/email.service.js";
+import { verifyEmailConfiguration } from "./services/email.service.js";
 
 validateEnvironment();
 
@@ -37,12 +37,11 @@ async function startServer() {
   }
 
   try {
-    await verifyEmailProvider();
-    console.log("Brevo API credentials verified");
+    verifyEmailConfiguration();
+    console.log("Brevo email configuration verified");
   } catch (error) {
-    console.error("Brevo API verification failed; email delivery may not work.", {
-      code: error?.code,
-      status: error?.status,
+    console.error("Brevo email configuration is invalid; email delivery may not work.", {
+      message: error?.message,
     });
   }
 

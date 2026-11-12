@@ -11,7 +11,7 @@
 ## Email delivery and account settings
 
 - Configure `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in the server `.env`. The sender address must be verified in Brevo. Keep the API key private.
-- On API startup, the server calls Brevo's account endpoint to verify the API key and logs a safe diagnostic if verification fails. This does not verify inbox delivery.
+- On API startup, the server validates that the Brevo API key and sender email are configured. It does not call Brevo; the API key and sender are validated when an email is sent.
 - Password-reset requests always return a generic confirmation and never return a reset token or link in the API response. If no email arrives locally, inspect the API terminal for `Brevo API verification failed` or `Password reset email delivery failed`; a failed delivery invalidates the reset token.
 - An accepted send confirms Brevo accepted the message, not that it reached the inbox. Check Brevo's transactional email activity and the recipient's spam folder if the message is missing.
 - Signed-in users can update their first and last name. Changing a password requires the current password and revokes other active refresh sessions. Email changes are unavailable until an email-verification flow is implemented.
