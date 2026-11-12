@@ -602,8 +602,7 @@ export async function forgotPassword(req, res) {
       } catch (emailError) {
         console.error("Password reset email delivery failed.", {
           code: emailError?.code,
-          command: emailError?.command,
-          responseCode: emailError?.responseCode,
+          status: emailError?.status,
         });
 
         try {
@@ -912,8 +911,7 @@ export async function createInvitation(req, res) {
       } catch (emailError) {
         console.error("Invitation email delivery failed.", {
           code: emailError?.code,
-          command: emailError?.command,
-          responseCode: emailError?.responseCode,
+          status: emailError?.status,
         });
 
         if (process.env.NODE_ENV === "production") {

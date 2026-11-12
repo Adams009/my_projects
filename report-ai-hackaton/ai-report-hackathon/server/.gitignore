@@ -2,5 +2,10 @@
 node_modules
 /src/generated/prisma
 test/
+!test/
+test/*
+!test/security.test.js
+!test/report-image.middleware.test.js
 .env.*
 !.env.example
+email-test.js

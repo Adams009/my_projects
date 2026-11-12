@@ -59,11 +59,8 @@ export function validateEnvironment() {
     "JWT_REFRESH_SECRET",
     "CORS_ORIGINS",
     "CLIENT_URL",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASSWORD",
-    "SMTP_FROM",
+    "BREVO_API_KEY",
+    "BREVO_SENDER_EMAIL",
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
@@ -88,10 +85,6 @@ export function validateEnvironment() {
     throw new Error("JWT_SECRET and JWT_REFRESH_SECRET must be different");
   }
 
-  const smtpPort = Number(process.env.SMTP_PORT);
-  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
-    throw new Error("SMTP_PORT must be an integer between 1 and 65535");
-  }
 
   for (const origin of getAllowedOrigins()) {
     let parsedOrigin;

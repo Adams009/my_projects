@@ -10,10 +10,10 @@
 
 ## Email delivery and account settings
 
-- Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` in the server `.env`. Use a sender address verified by your mail provider.
-- On API startup, the server verifies the SMTP connection and authentication and logs a safe diagnostic if verification fails. This does not verify that a sender is approved or that messages reach an inbox.
-- Password-reset requests always return a generic confirmation and never return a reset token or link in the API response. If no email arrives locally, inspect the API terminal for `SMTP verification failed` or `Password reset email delivery failed`; a failed delivery invalidates the reset token.
-- An accepted SMTP send only confirms the provider accepted the message. Check the provider's activity/logs and the recipient's spam folder if the message is missing.
+- Configure `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in the server `.env`. The sender address must be verified in Brevo. Keep the API key private.
+- On API startup, the server calls Brevo's account endpoint to verify the API key and logs a safe diagnostic if verification fails. This does not verify inbox delivery.
+- Password-reset requests always return a generic confirmation and never return a reset token or link in the API response. If no email arrives locally, inspect the API terminal for `Brevo API verification failed` or `Password reset email delivery failed`; a failed delivery invalidates the reset token.
+- An accepted send confirms Brevo accepted the message, not that it reached the inbox. Check Brevo's transactional email activity and the recipient's spam folder if the message is missing.
 - Signed-in users can update their first and last name. Changing a password requires the current password and revokes other active refresh sessions. Email changes are unavailable until an email-verification flow is implemented.
 
 ## Report images
@@ -25,7 +25,7 @@
 
 ## Production requirements
 
-- Set `NODE_ENV=production` and provide every required setting in `.env.example`, including SMTP and Cloudinary credentials.
+- Set `NODE_ENV=production` and provide every required setting in `.env.example`, including Brevo and Cloudinary credentials.
 - Use separate random JWT secrets of at least 32 bytes, an HTTPS `CLIENT_URL`, and exact HTTPS entries in `CORS_ORIGINS`.
 - Use `AUTH_COOKIE_SAME_SITE=lax` for same-site deployments. For cross-site deployments, set `AUTH_COOKIE_SAME_SITE=none` and `AUTH_COOKIE_SECURE=true`; serve the API only over HTTPS.
 - Set `TRUST_PROXY_HOPS` only to the exact number of trusted reverse proxies in front of Express. Do not trust arbitrary forwarded headers.

@@ -3,7 +3,7 @@ import app from "./app.js";
 import { validateEnvironment } from "./config/environment.js";
 import { closeRateLimitStores } from "./lib/rate-limit-store.js";
 import { prisma } from "./lib/prisma.js";
-import { verifyEmailTransport } from "./services/email.service.js";
+import { verifyEmailProvider } from "./services/email.service.js";
 
 validateEnvironment();
 
@@ -25,6 +25,7 @@ async function startServer() {
         'Database migration is missing: run "npm run db:migrate:deploy" before starting the API',
       );
     }
+    console.log("Database connection verified");
   } catch (error) {
     console.error(
       "CivicFix API startup failed: PostgreSQL is unavailable or its migrations are not applied.",
@@ -36,13 +37,12 @@ async function startServer() {
   }
 
   try {
-    await verifyEmailTransport();
-    console.log("SMTP connection verified");
+    await verifyEmailProvider();
+    console.log("Brevo API credentials verified");
   } catch (error) {
-    console.error("SMTP verification failed; email delivery may not work.", {
+    console.error("Brevo API verification failed; email delivery may not work.", {
       code: error?.code,
-      command: error?.command,
-      responseCode: error?.responseCode,
+      status: error?.status,
     });
   }
 
