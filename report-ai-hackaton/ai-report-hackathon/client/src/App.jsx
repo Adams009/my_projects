@@ -3467,13 +3467,30 @@ function App() {
                             updateReportStatus(report.id, event.target.value)
                           }
                         >
-                          <option value="SUBMITTED">Submitted</option>
-                          <option value="UNDER_REVIEW">Under review</option>
-                          <option value="ASSIGNED">Assigned</option>
-                          <option value="ACKNOWLEDGED">Acknowledged</option>
-                          <option value="IN_PROGRESS">In progress</option>
+                          {!(
+                            report.assignedTeamId
+                              ? ["NEEDS_INFORMATION", "REASSIGNMENT_REQUESTED"]
+                              : [
+                                  "SUBMITTED",
+                                  "UNDER_REVIEW",
+                                  "NEEDS_INFORMATION",
+                                  "REASSIGNMENT_REQUESTED",
+                                ]
+                          ).includes(report.status) && (
+                            <option value={report.status} disabled>
+                              {formatStatus(report.status)} (managed by workflow)
+                            </option>
+                          )}
+                          {!report.assignedTeamId && (
+                            <>
+                              <option value="SUBMITTED">Submitted</option>
+                              <option value="UNDER_REVIEW">Under review</option>
+                            </>
+                          )}
                           <option value="NEEDS_INFORMATION">Needs information</option>
-                          <option value="RESOLVED">Resolved</option>
+                          <option value="REASSIGNMENT_REQUESTED">
+                            Reassignment requested
+                          </option>
                         </select>
                       </div>
                     </article>
